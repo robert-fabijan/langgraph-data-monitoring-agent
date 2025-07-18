@@ -1,0 +1,29 @@
+[project]
+name = "langgraph-data-monitoring-agent"
+version = "0.1.0"
+description = "A data monitoring agent using LangGraph."
+authors = [
+    { name = "Robert Fabijan", email = "robert.f.fabijan@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "langgraph",
+    "langchain",
+    "langgraph-prebuilt",
+    "langgraph-sdk",
+    "langgraph-checkpoint-sqlite",
+    "langsmith",
+    "langchain-community",
+    "langchain-core",
+    "langchain-openai",
+    "notebook",
+    "tavily-python",
+    "wikipedia",
+    "trustcall",
+    "langgraph-cli[inmem]"
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"

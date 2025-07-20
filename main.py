@@ -17,4 +17,5 @@ if __name__ == "__main__":
     raw_data = None
     with open("data.json", "r") as f:
         raw_data = json.load(f)
-    graph.invoke({"raw_data": raw_data})
+    result = graph.invoke({"raw_data": raw_data})
+    print(result["summary"])

@@ -4,12 +4,23 @@ from operator import add
 from typing import List, Optional, Annotated
 from langgraph_dma.personas import ITSupport
 from langgraph_dma.llm import OPENAILLM
+import logging
 
+persona = ITSupport(
+    affiliation="Tech Support",
+    name="Alex",
+    role="IT Support Analyst",
+    description="""
+        Responsible for monitoring and analyzing data quality for a specific system or asset.
+        Focuses on assessing the health and reliability of data, identifying issues.
+        Providing actionable insights from an IT support perspective.
+    """
+)
 
 class InterviewState(MessagesState):
     max_num_turns: int # Number turns of conversation
     context: Annotated[list, add] # Source docs
-    analyst: ITSupport # Analyst asking questions
+    # analyst: ITSupport # Analyst asking questions
     clean_data: List[str] # Cleaned data logs
     # interview: str # Interview transcript
     summary: list # Final key we duplicate in outer state for Send() API
@@ -33,7 +44,7 @@ b. Summary (### header)
 c. Data Review (### header)
 d. Recommendations (### header)
 
-4. Make your title engaging based upon the focus area of the analyst: {focus}
+4. Focus on following tasks: {focus}
 
 5. For the summary section:
 - Provide general background/context related to the focus area
@@ -68,13 +79,18 @@ def write_analysis(state: InterviewState):
 
     # Get state
     # interview = state["interview"]
-    context = state["context"]
-    analyst = state["analyst"]
+
+    context = state["clean_data"]
+    print()
+    print("Context of subgraph")
+    print(context)
+    # analyst = state["analyst"]
    
     # Write section using either the gathered source docs from interview (context) or the interview itself (interview)
-    system_message = section_writer_instructions.format(focus=analyst.description)
+    system_message = section_writer_instructions.format(focus=persona.description)
     summary = OPENAILLM.invoke([SystemMessage(content=system_message)]+[HumanMessage(content=f"Use this source to write your section: {context}")]) 
-                
+    
+    logging.info(f"Summary: {summary.content}")
     # Append it to state
     return {"summary": [summary.content]}
 

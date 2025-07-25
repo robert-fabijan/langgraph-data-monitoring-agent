@@ -1,5 +1,5 @@
 [project]
-name = "langgraph-data-monitoring-agent"
+name = "langgraph-dma"
 version = "0.1.0"
 description = "A data monitoring agent using LangGraph."
 authors = [
@@ -23,6 +23,9 @@ dependencies = [
     "trustcall",
     "langgraph-cli[inmem]"
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

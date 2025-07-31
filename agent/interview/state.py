@@ -6,100 +6,93 @@ from langgraph_dma.personas import ITSupport
 from langgraph_dma.llm import OPENAILLM
 import logging
 
-persona = ITSupport(
-    affiliation="Tech Support",
-    name="Alex",
-    role="IT Support Analyst",
-    description="""
-        Responsible for monitoring and analyzing data quality for a specific system or asset.
-        Focuses on assessing the health and reliability of data, identifying issues.
-        Providing actionable insights from an IT support perspective.
-    """
-)
+# persona = ITSupport(
+#     affiliation="Tech Support",
+#     name="Alex",
+#     role="IT Support Analyst",
+#     description="""
+#         Responsible for monitoring and analyzing data quality for a specific system or asset.
+#         Focuses on assessing the health and reliability of data, identifying issues.
+#         Providing actionable insights from an IT support perspective.
+#     """
+# )
 
-class InterviewState(MessagesState):
-    max_num_turns: int # Number turns of conversation
-    context: Annotated[list, add] # Source docs
-    # analyst: ITSupport # Analyst asking questions
-    clean_data: List[str] # Cleaned data logs
-    # interview: str # Interview transcript
-    summary: list # Final key we duplicate in outer state for Send() API
+class AnalysisState(MessagesState):
+    max_num_turns: int
+    context: Annotated[list, add]
+    clean_data: List[str]
+    rules: List[str]
+    analysis: str
+    rejected_data: List[str]
 
 
-section_writer_instructions = """
-You are an expert IT Support analyst.
+ANALYSIS_INSTRUCTION = """
+    ## Improved Prompt for Data Validation
+    You are a meticulous Data Quality Analyst. Your sole purpose is to validate a given dataset against a set of predefined rules.
 
-Your task is to create a short, easily digestible section of a report based on the current state and condition of monitored data.
+    ## Instructions
+    Analyze the provided `DATA` against each condition listed in the `RULES`.
 
-1. Analyze the data provided:
-- Review metrics such as null values, threshold breaches, anomalies, and overall data health.
+    Identify every specific violation where the data does not meet a rule.
 
-2. Create a report structure using markdown formatting:
-- Use ## for the section title
-- Use ### for sub-section headers
+    Report your findings as a concise, bulleted list of violations. For each rule, list out the specific data points that violate it.
 
-3. Write the report following this structure:
-a. Title (## header)
-b. Summary (### header)
-c. Data Review (### header)
-d. Recommendations (### header)
+    If no violations are found, you MUST respond with the exact phrase: `No validation errors detected`.
 
-4. Focus on following tasks: {focus}
+    Do not add any extra explanations, greetings, or sign-offs. Go straight to the report.
 
-5. For the summary section:
-- Provide general background/context related to the focus area
-- Emphasize what is novel, interesting, or surprising about the data's current state
-- Create a numbered list of key findings as you review the data
-- Do not mention the names of interviewers or experts
-- Aim for approximately 400 words maximum
+    DATA: 
+    -#-#-#-
+    {DATA}
+    -#-#-#-
 
-6. In the Data Review section:
-- Include all relevant metrics and observations
-- Clearly state if data is in good condition, if thresholds are exceeded, or if there are too many nulls
-- Separate each finding by a newline. Use two spaces at the end of each line to create a newline in Markdown.
-- Example:
-
-### Data Review
-[1] Null values detected in POWER tag  
-[2] Threshold exceeded for WIND_SPEED  
-
-7. In the Recommendations section:
-- Suggest actions to resolve or mitigate detected issues
-- Provide clear, actionable steps for IT Support or stakeholders
-
-8. Final review:
-- Ensure the report follows the required structure
-- Include no preamble before the title of the report
-- Check that all guidelines have been followed
+    RULES:
+    -#-#-#-
+    {RULES}
+    -#-#-#-
 """
 
-def write_analysis(state: InterviewState):
 
+
+
+def analyse_data(state: AnalysisState):
     """ Node to answer a question """
-
-    # Get state
-    # interview = state["interview"]
-
-    context = state["clean_data"]
-    print()
-    print("Context of subgraph")
-    print(context)
-    # analyst = state["analyst"]
    
-    # Write section using either the gathered source docs from interview (context) or the interview itself (interview)
-    system_message = section_writer_instructions.format(focus=persona.description)
-    summary = OPENAILLM.invoke([SystemMessage(content=system_message)]+[HumanMessage(content=f"Use this source to write your section: {context}")]) 
-    
-    logging.info(f"Summary: {summary.content}")
+    system_message = ANALYSIS_INSTRUCTION.format(
+        DATA = state["clean_data"],
+        RULES = state["rules"]
+    )
+    analysis_results = OPENAILLM.invoke(
+        [SystemMessage(content=system_message)] + 
+        [HumanMessage(content=f"Does the provided data look good?")]
+    )
     # Append it to state
-    return {"summary": [summary.content]}
+    return {"analysis": analysis_results.content}
 
-def build_interview_state():
+
+def get_rejected_data(state: AnalysisState):
+    """ Extracts the rejected data from the analysis results """
+    analysis = state["analysis"]
+    if "No validation errors detected" in analysis:
+        return {"rejected_data": []}
+    
+    rejected_data_output = OPENAILLM.invoke(
+        [SystemMessage(content="Please provide the specific data points that violate the rules in .json string format.")] +
+        [HumanMessage(content=f"Analysis: {state["analysis"]}")] + 
+        [HumanMessage(content=f"Source data: {state["clean_data"]}")]
+    )
+    return {"rejected_data": [rejected_data_output.content]}
+
+
+
+def build_interview_graph():
     # Add nodes and edges 
-    interview_builder = StateGraph(InterviewState)
-    interview_builder.add_node("write_analysis", write_analysis)
+    interview_builder = StateGraph(AnalysisState)
+    interview_builder.add_node("analyse_data", analyse_data)
+    interview_builder.add_node("get_rejected_data", get_rejected_data)
     # Flow
-    interview_builder.add_edge(START, "write_analysis")
-    interview_builder.add_edge("write_analysis", END)
+    interview_builder.add_edge(START, "analyse_data")
+    interview_builder.add_edge("analyse_data", "get_rejected_data")
+    interview_builder.add_edge("get_rejected_data", END)
     return interview_builder
 

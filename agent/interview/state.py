@@ -1,21 +1,11 @@
 from langgraph.graph import START, END, StateGraph,MessagesState
-from langchain_core.messages import  SystemMessage, HumanMessage
+from langchain_core.messages import  SystemMessage, HumanMessage, AIMessage
 from operator import add
 from typing import List, Optional, Annotated
 from langgraph_dma.personas import ITSupport
 from langgraph_dma.llm import OPENAILLM
 import logging
 
-# persona = ITSupport(
-#     affiliation="Tech Support",
-#     name="Alex",
-#     role="IT Support Analyst",
-#     description="""
-#         Responsible for monitoring and analyzing data quality for a specific system or asset.
-#         Focuses on assessing the health and reliability of data, identifying issues.
-#         Providing actionable insights from an IT support perspective.
-#     """
-# )
 
 class AnalysisState(MessagesState):
     max_num_turns: int
@@ -34,8 +24,6 @@ ANALYSIS_INSTRUCTION = """
     Analyze the provided `DATA` against each condition listed in the `RULES`.
 
     Identify every specific violation where the data does not meet a rule.
-
-    Report your findings as a concise, bulleted list of violations. For each rule, list out the specific data points that violate it.
 
     If no violations are found, you MUST respond with the exact phrase: `No validation errors detected`.
 
@@ -77,11 +65,14 @@ def get_rejected_data(state: AnalysisState):
         return {"rejected_data": []}
     
     rejected_data_output = OPENAILLM.invoke(
-        [SystemMessage(content="Please provide the specific data points that violate the rules in .json string format.")] +
+        [SystemMessage(content="Please provide the specific data points that violate the rules. Focus on asset, time range and tag name.")] +
         [HumanMessage(content=f"Analysis: {state["analysis"]}")] + 
         [HumanMessage(content=f"Source data: {state["clean_data"]}")]
     )
-    return {"rejected_data": [rejected_data_output.content]}
+    return {
+        "rejected_data": [rejected_data_output.content],
+        "messages": [AIMessage(content=rejected_data_output.content)]
+    }
 
 
 

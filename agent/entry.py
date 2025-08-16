@@ -2,7 +2,7 @@ from typing import List, Optional, Annotated
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
 from IPython.display import Image, display
-from langgraph.graph import START, END, StateGraph
+from langgraph.graph import START, END, StateGraph, MessagesState
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.constants import Send
@@ -20,16 +20,16 @@ RULES = [
 
 
 
-class ResearchGraphState(TypedDict):
+class ResearchGraphState(MessagesState):
     raw_data: List[RealTimeDataLogs]
     rules: List[str]
     clean_data: List[RealTimeDataLogs]
-    topic: str # Research topic
-    update: str
-    final_report: str # Final report
+    rejected_data: List[str]
+    update: List[str]
+    final_report: str
 
 
-def read(state):
+def read(state: ResearchGraphState):
     raw_data = state["raw_data"]
     '''
     processing ...
@@ -46,9 +46,7 @@ def read(state):
 def finalize_report(state: ResearchGraphState):
     """ Finalize the report by combining all sections """
     sections = state["update"]
-    # Combine all sections into a final report
-    final_report = "\n\n".join(sections)
-    return {"final_report": final_report}
+    return {"final_report": sections}
 
 def build_agent():
     builder = StateGraph(ResearchGraphState)
